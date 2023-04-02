@@ -44,6 +44,7 @@ class PlaneTruss:
         id1, id2 = self.members[idx]
         coords1 = self.joints[id1]
         coords2 = self.joints[id2]
+
         return np.sqrt(np.sum((coords2 - coords1)**2))
 
     def angle(self, idx):
