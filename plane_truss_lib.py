@@ -13,11 +13,11 @@ import matplotlib.pyplot as plt
 
 class PlaneTruss:
     def __init__(self, joints, members, E, A):
-        self.dim = 2
+        self.dim = 3
 
         self.joints = joints
         self.members = members
-
+        print(self.joints)
         self.n_joints = len(joints)
         self.n_members = len(members)
 
@@ -32,13 +32,15 @@ class PlaneTruss:
             self.As = A*np.ones(self.n_members)
 
         self.Ls = self.compute_lengths()
-        self.thetas = self.compute_angles()
-
+        self.cosines = self.compute_cosines()
+        print(self.cosines)
         self.n_dofs = self.dim*self.n_joints
         self.dofs = np.array([np.nan for _ in range(self.n_dofs)])
 
         self.K = np.zeros((self.n_dofs, self.n_dofs))
         self.F = np.zeros(self.n_dofs)
+
+        self.member_stiffness(0)
 
     def length(self, idx):
         id1, id2 = self.members[idx]
@@ -47,13 +49,16 @@ class PlaneTruss:
 
         return np.sqrt(np.sum((coords2 - coords1)**2))
 
-    def angle(self, idx):
+    def cosine(self, idx):
         L = self.length(idx)
         id1, id2 = self.members[idx]
         coords1 = self.joints[id1]
         coords2 = self.joints[id2]
         dx = coords2[0] - coords1[0]
-        return np.arccos(dx/L)
+        dy = coords2[1] - coords1[0]
+        dz = coords2[2] - coords2[2]
+
+        return np.array([dx, dy, dz])
 
     def compute_lengths(self):
         Ls = np.zeros(self.n_members)
@@ -61,11 +66,11 @@ class PlaneTruss:
             Ls[i] = self.length(i)
         return Ls
 
-    def compute_angles(self):
-        thetas = np.zeros(self.n_members)
+    def compute_cosines(self):
+        cosines = np.zeros((self.n_members, 3))
         for i in range(self.n_members):
-            thetas[i] = self.angle(i)
-        return thetas
+            cosines[i] = self.cosine(i)
+        return cosines
 
     def apply_constraints(self, constraints):
         for c in constraints:
@@ -76,29 +81,52 @@ class PlaneTruss:
             self.F[self.dim*l[0] + l[1]] = l[2]
 
     def member_stiffness(self, idx):
-        K = np.zeros((4, 4))
-        c = np.cos(self.thetas[idx])
-        s = np.sin(self.thetas[idx])
+        K = np.zeros((6, 6))
+        cx = self.cosines[:,0]
+        cy = self.cosines[:,1]
+        cz = self.cosines[:,2]
+        print(cx)
+        K[0, 0] = cx*cx
+        K[0, 1] = cx*cy
+        K[0, 2] = cx*cz
+        K[0, 3] = -cx*cx
+        K[0, 4] = -cy*cy
+        K[0, 5] = -cz*cz
 
-        K[0, 0] = c*c
-        K[0, 1] = c*s
-        K[0, 2] = -c*c
-        K[0, 3] = -c*s
+        K[1, 0] = cx*cy
+        K[1, 1] = cy*cy
+        K[1, 2] = -cy*cz
+        K[1, 3] = -cx*cy
+        K[1, 4] = -cy*cy
+        K[1, 5] = -cy*cz
 
-        K[1, 0] = c*s
-        K[1, 1] = s*s
-        K[1, 2] = -c*s
-        K[1, 3] = -s*s
+        K[2, 0] = -cx*cz
+        K[2, 1] = -cy*cz
+        K[2, 2] = cz*cz
+        K[2, 3] = -cx*cz
+        K[2, 4] = -cy*cz
+        K[2, 5] = -cz*cz
 
-        K[2, 0] = -c*c
-        K[2, 1] = -c*s
-        K[2, 2] = c*c
-        K[2, 3] = c*s
+        K[3, 0] = -cx*cx
+        K[3, 1] = -cx*cy
+        K[3, 2] = -cx*cz
+        K[3, 3] = cx*cx
+        K[3, 4] = cx*cy
+        K[3, 5] = cx*cz
 
-        K[3, 0] = -c*s
-        K[3, 1] = -s*s
-        K[3, 2] = c*s
-        K[3, 3] = s*s
+        K[4, 0] = -cx*cy
+        K[4, 1] = -cy*cy
+        K[4, 2] = -cy*cz
+        K[4, 3] = cx*cz
+        K[4, 4] = cy*cy
+        K[4, 5] = cy*cz
+
+        K[5, 0] = -cx*cz
+        K[5, 1] = -cy*cz
+        K[5, 2] = -cz*cz
+        K[5, 3] = cx*cz
+        K[5, 4] = cy*cz
+        K[5, 5] = cz*cz
 
         return self.Es[idx]*self.As[idx]*K/self.Ls[idx]
 
