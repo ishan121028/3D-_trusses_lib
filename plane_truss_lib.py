@@ -10,6 +10,8 @@ AE 238: Aerospace Structural Mechanics
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+
 
 class PlaneTruss:
     def __init__(self, joints, members, E, A):
@@ -17,7 +19,10 @@ class PlaneTruss:
 
         self.joints = joints
         self.members = members
+
         # print(self.joints)
+
+        print(self.joints)
         self.n_joints = len(joints)
         self.n_members = len(members)
 
@@ -33,15 +38,13 @@ class PlaneTruss:
 
         self.Ls = self.compute_lengths()
         self.cosines = self.compute_cosines()
-        
         self.n_dofs = self.dim*self.n_joints
         self.dofs = np.array([np.nan for _ in range(self.n_dofs)])
 
         self.K = np.zeros((self.n_dofs, self.n_dofs))
         self.F = np.zeros(self.n_dofs)
-
         self.compute_stiffness()
-
+        self.member_stiffness(0)
     def length(self, idx):
         id1, id2 = self.members[idx]
         coords1 = self.joints[id1]
@@ -83,12 +86,14 @@ class PlaneTruss:
     def member_stiffness(self, idx):
         K = np.zeros((6, 6))
         (cx, cy, cz) = self.cosines[idx]
+        print(cx)
         K[0, 0] = cx*cx
         K[0, 1] = cx*cy
         K[0, 2] = cx*cz
         K[0, 3] = -cx*cx
         K[0, 4] = -cy*cy
         K[0, 5] = -cx*cz
+        K[0, 5] = -cz*cz
 
         K[1, 0] = cx*cy
         K[1, 1] = cy*cy
@@ -115,6 +120,12 @@ class PlaneTruss:
         K[4, 1] = -cy*cy
         K[4, 2] = -cy*cz
         K[4, 3] = cx*cy
+
+        K[4, 0] = -cx*cy
+        K[4, 1] = -cy*cy
+        K[4, 2] = -cy*cz
+        K[4, 3] = cx*cz
+
         K[4, 4] = cy*cy
         K[4, 5] = cy*cz
 
@@ -194,15 +205,16 @@ class PlaneTruss:
     def plot(self, deformed=True, mag=25):
         TOL = 1e-6
         fig = plt.figure(figsize=(6, 6))
+        ax = plt.axes(projection='3d')
 
         for i in range(self.n_members):
             id1, id2 = self.members[i]
-            plt.plot(
+            ax.plot3D(
                 [self.joints[id1, 0], self.joints[id2, 0]],
                 [self.joints[id1, 1], self.joints[id2, 1]],
                 '-', color='gray', linewidth=5)
 
-        plt.scatter(self.joints[:, 0], self.joints[:, 1], c='b', s=20)
+        ax.scatter3D(self.joints[:, 0], self.joints[:, 1], c='b', s=20)
 
         if deformed:
             for i in range(self.n_members):
@@ -218,7 +230,7 @@ class PlaneTruss:
                 elif self.member_forces[i] < -TOL:
                     color = 'red'
 
-                plt.plot(
+                ax.plot3D(
                     [x1, x2], [y1, y2],
                     '-', color=color, linewidth=3)
 
@@ -236,25 +248,24 @@ if __name__ == '__main__':
     [0.0, 1.0, 0.0]
 ])
 
-# Warning: Node numbering will affect the solution!!!
     members = np.array([
-        [0, 1],
-        [1, 2],
-        [2, 3],
-        [3, 4],
-        [5, 4],
-        [6, 5],
-        [7, 6],
-        [0, 7],
-        [0, 6],
-        [1, 6],
-        [1, 7],
-        [1, 5],
-        [2, 6],
-        [2, 5],
-        [2, 4],
-        [3, 5]
-    ], dtype= int)
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 4],
+    [5, 4],
+    [6, 5],
+    [7, 6],
+    [0, 7],
+    [0, 6],
+    [1, 6],
+    [1, 7],
+    [1, 5],
+    [2, 6],
+    [2, 5],
+    [2, 4],
+    [3, 5]
+], dtype= int)
 
     E = 2.1e11
     r = 2.5e-2
@@ -264,19 +275,18 @@ if __name__ == '__main__':
 
 
     constraints = [
-        [0, 0, 0.0],
-        [0, 1, 0.0],
-        [0, 2, 0.0],
-        [3, 0, 0.0],
-        [3, 2, 0.0],
-        [3, 1, 0.0],
-        [2, 2, 0.0],
-        [4, 2, 0.0],
-        [1, 2, 0.0],
-        [5, 2, 0.0],
-        [6, 2, 0.0],
-        [7, 2, 0.0]
-    ]
+    [0, 0, 0.0],
+    [0, 1, 0.0],
+    [0, 2, 0.0],
+    [3, 0, 0.0],
+    [3, 1, 0.0],
+    [3, 2, 0.0],
+    [4, 2, 0.0],
+    [5, 2, 0.0],
+    [6, 2, 0.0],
+    [7, 2, 0.0],
+    [1, 2, 0.0],
+]
 
     truss2.apply_constraints(constraints)
 
@@ -285,18 +295,14 @@ if __name__ == '__main__':
     Q = 200e3
 
     loads = [
-        [5, 1, -Q],
-        [6, 1, -P], 
+        [5, 0, Q],
+        [6, 0, P]
     ]
         
     truss2.apply_loads(loads)
     truss2.enforce_constraints()
     truss2.compute_reactions()
-    print("K", truss2.K)
-    print("F", truss2.F)
-    print("det(K): ", np.linalg.det(truss2.K))
     truss2.dofs = np.linalg.solve(truss2.K, truss2.F)
     truss2.compute_reactions()
     truss2.compute_member_forces()
-    print(truss2.reactions)
-    print(truss2.member_forces)
+    truss2.plot()
